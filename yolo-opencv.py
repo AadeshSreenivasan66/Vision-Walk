@@ -1,0 +1,94 @@
+import cv2
+import numpy as np
+from gtts import gTTS
+import os
+
+def get_output_layers(net):
+    layer_names = net.getLayerNames()
+    output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+    return output_layers
+
+def speak(text):
+    tts = gTTS(text=text, lang='en')  # Convert text to speech in English
+    tts.save("output.mp3")  # Save the speech output as an MP3 file
+    os.system("start output.mp3")  # Play the MP3 file to output the speech
+
+def perform_object_detection(config_path, weights_path, classes_path):
+    cap = cv2.VideoCapture(0)  # Accessing the webcam
+
+    net = cv2.dnn.readNet(weights_path, config_path)
+
+    with open(classes_path, 'r') as f:
+        classes = [line.strip() for line in f.readlines()]
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if frame is not None:
+            Width = frame.shape[1]
+            Height = frame.shape[0]
+
+            blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+
+            net.setInput(blob)
+            outs = net.forward(get_output_layers(net))
+
+            class_ids = []
+            confidences = []
+            boxes = []
+
+            for out in outs:
+                for detection in out:
+                    scores = detection[5:]
+                    class_id = np.argmax(scores)
+                    confidence = scores[class_id]
+                    if confidence > 0.5:  # Set the confidence as needed
+                        center_x = int(detection[0] * Width)
+                        center_y = int(detection[1] * Height)
+                        w = int(detection[2] * Width)
+                        h = int(detection[3] * Height)
+                        x = int(center_x - w / 2)
+                        y = int(center_y - h / 2)
+
+                        boxes.append([x, y, w, h])
+                        confidences.append(float(confidence))
+                        class_ids.append(class_id)
+
+            indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+
+            for i in range(len(boxes)):
+                if i in indexes:
+                    x, y, w, h = boxes[i]
+                    label = str(classes[class_ids[i]])
+                    confidence = confidences[i]
+                    color = (255, 0, 0)  # Set bounding box color (here, blue)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                    cv2.putText(frame, label + ' ' + str(round(confidence, 2)), (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+            cv2.imshow('Object Detection via Webcam', frame)
+
+            distance = calculate_distance(30, 100, w)  # Example parameters for object width, focal length, and pixel width
+            if 0 < distance < 20:
+                speak("Stop Stop! Close object in front.")
+            elif 20 < distance < 60:
+                speak("Object is at a moderate distance.")
+            elif 60 < distance < 100:
+                speak("Object 1 meter away.")
+            else:
+                speak("Object is far.")
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            else:
+                print("Unable to capture frame, please check the webcam")
+
+    cap.release()  # Release the capture
+    cv2.destroyAllWindows()
+
+def calculate_distance(object_width, focal_length, pixel_width):
+    # Calculate the distance of the object from the camera using the formula: distance = (object_width * focal_length) / pixel_width
+    distance = (object_width * focal_length) / pixel_width
+    return distance
+perform_object_detection(r'C:\Users\91945\OneDrive\Desktop\dip proj\yolov3 config.cfg' , r'C:\Users\91945\OneDrive\Desktop\dip proj\yolov3.weights',r'C:\Users\91945\OneDrive\Desktop\dip proj\coco.names')
