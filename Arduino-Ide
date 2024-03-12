@@ -1,0 +1,63 @@
+#include <Servo.h>
+
+// defines pins numbers
+const int trigPin = 9;
+const int echoPin = 10;
+const int buzzer = 11;
+const int ledPin = 13;
+const int servoPin = 6; // Choose appropriate pin for servo motor
+
+// defines variables
+long duration;
+int distance;
+int safetyDistance;
+Servo myServo; // Create a servo object to control a servo motor
+
+void setup() {
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+  pinMode(buzzer, OUTPUT);
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600); // Starts the serial communication
+  myServo.attach(servoPin); // Attaches the servo on the pin
+}
+
+void loop() {
+  // Clears the trigPin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  // Sets the trigPin on HIGH state for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+
+  // Calculating the distance
+  distance = duration * 0.034 / 2;
+
+  safetyDistance = distance;
+  
+  if (safetyDistance <= 100) {
+    digitalWrite(buzzer, HIGH);
+    digitalWrite(ledPin, HIGH);
+    // If an object is detected, stop the servo
+    myServo.write(180); // Stop the servo
+  } 
+  else {
+    digitalWrite(buzzer, LOW);
+    digitalWrite(ledPin, LOW);
+    // If no object is detected, move the servo to scan for objects
+    for (int angle = 0; angle <= 180; angle += 10) { // Scan from 0 to 180 degrees
+      myServo.write(angle); // Move servo to the current angle
+      delay(100); // Wait for the servo to reach the position
+      duration = pulseIn(echoPin, HIGH); // Measure distance
+      distance = duration * 0.034 / 2; // Calculate distance
+      if (distance <= 30) { // If object detected
+        break; // Exit the loop
+      }
+    }
+  }
+}
